@@ -175,8 +175,11 @@ class KasirDashboardController extends Controller
      */
     public function createTicket(Request $request)
     {
+        // Mulai database transaction di level PHP untuk safety tambahan
+        // (opsional, karena SP header sudah insert, tapi berguna jika loop detail gagal)
+
         try {
-            // Validate the request data
+            // 1. Validate the request data
             $validatedData = $request->validate([
                 'customer_name' => 'required|string|max:255',
                 'customer_email' => 'nullable|email|max:255',
@@ -188,46 +191,55 @@ class KasirDashboardController extends Controller
                 'total_amount' => 'required|numeric|min:0'
             ]);
 
-            // Extract schedule information
+            // Extract info
             $schedule = $validatedData['schedule'];
             $jadwalId = $schedule['id_jadwal'];
             $customerName = $validatedData['customer_name'];
             $customerPhone = $validatedData['customer_phone'];
             $customerEmail = $validatedData['customer_email'] ?? '';
-            $totalAmount = $validatedData['total_amount'];
+            $totalAmount = (int) $validatedData['total_amount']; // Cast ke int sesuai SP
             $paymentMethod = $validatedData['payment_method'];
             $seats = $validatedData['seats'];
 
-            // Create or get customer using stored procedure
+            // 2. Create or get customer
             $customerId = $this->createOrGetCustomer($customerName, $customerPhone, $customerEmail);
 
-            // Create transaction using stored procedure
+            // 3. Create Transaction Header
+            // Params: @id_pelanggan, @id_jadwal, @total_bayar, @metode_pembayaran, @waktu_transaksi
             $transactionResult = DB::select('EXEC sp_CreateTransaksi ?, ?, ?, ?, ?', [
                 $customerId,
                 $jadwalId,
                 $totalAmount,
                 $paymentMethod,
-                now()->format('Y-m-d H:i:s')
+                now()->format('Y-m-d H:i:s') // Waktu transaksi
             ]);
 
             if (empty($transactionResult)) {
-                throw new \Exception('Gagal membuat transaksi');
+                throw new \Exception('Gagal membuat header transaksi.');
             }
 
-            $transactionId = $transactionResult[0]->id_transaksi ?? $transactionResult[0]->id;
+            $transactionId = $transactionResult[0]->id_transaksi;
 
-            // Create transaction details for each seat using stored procedure
-            foreach ($seats as $seat) {
-                // Create detail using stored procedure
+            // 4. Create Transaction Details (Looping Kursi)
+            foreach ($seats as $seatCode) {
+                // Params: @id_transaksi, @id_jadwal, @seat_code, @harga
                 $detailResult = DB::select('EXEC sp_CreateDetailTransaksi ?, ?, ?, ?', [
                     $transactionId,
                     $jadwalId,
-                    $seat, // seat_code like "A1", "B5"
+                    $seatCode,
                     $schedule['harga_film']
                 ]);
 
-                if (empty($detailResult)) {
-                    Log::warning("Failed to create detail for seat {$seat}");
+                // Cek Status dari SP
+                // SP return: status, seat_id, message
+                if (empty($detailResult) || $detailResult[0]->status === 'error') {
+
+                    // Ambil pesan error dari SP
+                    $errorMsg = $detailResult[0]->message ?? 'Unknown error';
+
+                    // Critical: Jika satu kursi gagal (misal taken), batalkan semua?
+                    // Disini kita throw exception agar masuk catch block
+                    throw new \Exception("Gagal booking kursi {$seatCode}: {$errorMsg}");
                 }
             }
 
@@ -235,10 +247,14 @@ class KasirDashboardController extends Controller
                 'success' => true,
                 'message' => 'Transaksi berhasil dibuat',
                 'transaction_id' => $transactionId,
-                'total_amount' => $validatedData['total_amount'],
-                'ticket_count' => $validatedData['ticket_count']
+                'total_amount' => $totalAmount,
+                'ticket_count' => count($seats)
             ]);
         } catch (\Exception $e) {
+            // Jika terjadi error (misal kursi sudah dibooking orang lain),
+            // Idealnya kita hapus header transaksi yang sudah terlanjur dibuat agar tidak jadi data sampah.
+            // DB::statement('DELETE FROM transaksis WHERE id_transaksi = ?', [$transactionId ?? 0]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal memproses transaksi: ' . $e->getMessage()
@@ -252,38 +268,51 @@ class KasirDashboardController extends Controller
     private function createOrGetCustomer($name, $phone, $email = '')
     {
         try {
-            // Check if customer exists using stored procedure
+            // 1. Cek Customer via SP
             $existingCustomer = DB::select('EXEC sp_GetPelangganByPhone ?', [$phone]);
 
             if (!empty($existingCustomer)) {
+                // SP mengembalikan kolom 'id' atau 'id_pelanggan'
                 return $existingCustomer[0]->id_pelanggan ?? $existingCustomer[0]->id;
             }
 
-            // Create new customer using stored procedure
+            // 2. Buat Customer Baru via SP
+            // Params: @nama, @email, @telp
             $customerResult = DB::select('EXEC sp_CreatePelanggan ?, ?, ?', [
                 $name,
                 $email,
                 $phone
             ]);
 
-            if (empty($customerResult)) {
-                throw new \Exception('Gagal membuat pelanggan');
+            // Cek Status return SP
+            if (!empty($customerResult) && $customerResult[0]->status === 'error') {
+                // Jika email duplikat atau error lain dari SP
+                throw new \Exception($customerResult[0]->message);
             }
 
-            return $customerResult[0]->id_pelanggan ?? $customerResult[0]->id;
+            if (empty($customerResult)) {
+                throw new \Exception('SP CreatePelanggan tidak mengembalikan data.');
+            }
+
+            return $customerResult[0]->id_pelanggan;
         } catch (\Exception $e) {
-            // Fallback: create customer manually if stored procedures fail
+            // Fallback: Jika SP gagal total, coba insert manual
+            // Hati-hati: Fallback hanya jalan jika error bukan dari logic SP (misal koneksi putus)
+            // Jika error karena validasi email di SP, insert manual juga akan gagal (constraint).
+
             try {
+                // Perbaiki nama kolom sesuai Schema SQL Server kita (telp, bukan no_telepon)
                 $customerId = DB::table('pelanggans')->insertGetId([
                     'nama' => $name,
                     'email' => $email,
-                    'no_telepon' => $phone,
-                    'tanggal_daftar' => now(),
+                    'telp' => $phone,         // PERBAIKAN: Gunakan 'telp'
+                    // 'tanggal_daftar' => now(), // HAPUS: Kolom ini sudah tidak ada, ganti created_at
                     'created_at' => now(),
                     'updated_at' => now()
                 ]);
                 return $customerId;
             } catch (\Exception $fallbackError) {
+                // Lempar error asli agar ketahuan kenapa gagal
                 throw new \Exception('Gagal membuat pelanggan: ' . $e->getMessage());
             }
         }

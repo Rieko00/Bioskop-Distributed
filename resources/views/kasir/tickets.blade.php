@@ -200,19 +200,22 @@
 
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Nama Pelanggan</label>
-                                <input type="text" id="customer_name" name="customer_name" required
+                                <input type="text" id="customer_name" name="customer_name" required minlength="2"
+                                    maxlength="255" placeholder="Masukkan nama lengkap"
                                     class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
                             </div>
 
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Email (Opsional)</label>
-                                <input type="email" id="customer_email" name="customer_email"
+                                <input type="email" id="customer_email" name="customer_email" maxlength="255"
+                                    placeholder="contoh@email.com"
                                     class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
                             </div>
 
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">No. HP</label>
                                 <input type="tel" id="customer_phone" name="customer_phone" required
+                                    pattern="[0-9+\-\s]+" minlength="8" maxlength="20" placeholder="08123456789"
                                     class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
                             </div>
                         </div>
@@ -462,6 +465,11 @@
                 scheduleSelect.innerHTML = '<option value="">Loading...</option>';
 
                 const response = await fetch(`/kasir/schedules/branch/${branchSelect.value}`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
                 const data = await response.json();
 
                 if (data.success && data.schedules.length > 0) {
@@ -472,15 +480,28 @@
                         option.value = JSON.stringify(schedule);
 
                         // Format time from waktu_mulai
-                        const timeFormatted = new Date('2000-01-01T' + schedule.waktu_mulai).toLocaleTimeString(
-                            'id-ID', {
-                                hour: '2-digit',
-                                minute: '2-digit'
-                            });
+                        let timeFormatted = 'N/A';
+                        if (schedule.waktu_mulai) {
+                            try {
+                                timeFormatted = new Date('2000-01-01T' + schedule.waktu_mulai)
+                                    .toLocaleTimeString(
+                                        'id-ID', {
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        });
+                            } catch (e) {
+                                timeFormatted = schedule.waktu_mulai;
+                            }
+                        }
 
                         // Build option text with correct property names
+                        // Handle both possible property name formats from stored procedures
+                        const judul = schedule.judul || schedule['Judul Film'] || 'Film';
+                        const studio = schedule.nama_studio || schedule['Studio'] || 'Studio';
+                        const harga = schedule.harga_film || schedule['Harga Tiket'] || schedule.harga || 0;
+
                         option.textContent =
-                            `${schedule.judul} - ${schedule.nama_studio} (${timeFormatted}) - Rp ${parseInt(schedule.harga_film).toLocaleString('id-ID')}`;
+                            `${judul} - ${studio} (${timeFormatted}) - Rp ${parseInt(harga).toLocaleString('id-ID')}`;
 
                         scheduleSelect.appendChild(option);
                     });
@@ -488,10 +509,12 @@
                     scheduleSelect.disabled = false;
                 } else {
                     scheduleSelect.innerHTML = '<option value="">Tidak ada jadwal tersedia untuk cabang ini</option>';
+                    showAlert('Tidak ada jadwal yang tersedia untuk cabang ini', 'info');
                 }
             } catch (error) {
                 console.error('Error loading schedules:', error);
                 scheduleSelect.innerHTML = '<option value="">Error loading schedules</option>';
+                showAlert('Gagal memuat jadwal. Silakan coba lagi.', 'error');
             }
         }
 
@@ -500,32 +523,64 @@
             const scheduleInfo = document.getElementById('schedule_info');
 
             if (select.value) {
-                selectedSchedule = JSON.parse(select.value);
+                try {
+                    selectedSchedule = JSON.parse(select.value);
 
-                // Update info display using correct property names
-                document.getElementById('selected_studio').textContent = selectedSchedule.nama_studio;
-                document.getElementById('selected_duration').textContent = selectedSchedule.durasi_menit + ' menit';
-                document.getElementById('selected_time').textContent = new Date('2000-01-01T' + selectedSchedule
-                    .waktu_mulai).toLocaleTimeString('id-ID', {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-                document.getElementById('selected_rating').textContent = selectedSchedule.rating_usia;
-                document.getElementById('selected_price').textContent = 'Rp ' + parseInt(selectedSchedule.harga_film)
-                    .toLocaleString('id-ID');
+                    // Update info display using correct property names
+                    // Handle both possible property name formats from stored procedures
+                    const studio = selectedSchedule.nama_studio || selectedSchedule['Studio'] || 'Studio';
+                    const durasi = selectedSchedule.durasi_menit || selectedSchedule['Durasi (Menit)'] || selectedSchedule
+                        .durasi || 0;
+                    const rating = selectedSchedule.rating_usia || selectedSchedule['Rating'] || 'G';
+                    const harga = selectedSchedule.harga_film || selectedSchedule['Harga Tiket'] || selectedSchedule
+                        .harga || 0;
 
-                scheduleInfo.classList.remove('hidden');
+                    document.getElementById('selected_studio').textContent = studio;
+                    document.getElementById('selected_duration').textContent = durasi + ' menit';
 
-                // Reset booked seats array and selected seats for new schedule
-                bookedSeats = [];
-                selectedSeats = [];
-                updateSelectedSeatsDisplay();
+                    // Safe time formatting
+                    let timeFormatted = 'N/A';
+                    if (selectedSchedule.waktu_mulai) {
+                        try {
+                            timeFormatted = new Date('2000-01-01T' + selectedSchedule.waktu_mulai).toLocaleTimeString(
+                                'id-ID', {
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                });
+                        } catch (e) {
+                            timeFormatted = selectedSchedule.waktu_mulai;
+                        }
+                    }
+                    document.getElementById('selected_time').textContent = timeFormatted;
 
-                // Load seat map for selected schedule using id_jadwal
-                // The stored procedure will handle both seat layout and booking status
-                loadSeatMap(selectedSchedule.id_jadwal);
+                    document.getElementById('selected_rating').textContent = rating;
+                    document.getElementById('selected_price').textContent = 'Rp ' + parseInt(harga).toLocaleString('id-ID');
 
-                calculateTotal();
+                    scheduleInfo.classList.remove('hidden');
+
+                    // Reset booked seats array and selected seats for new schedule
+                    bookedSeats = [];
+                    selectedSeats = [];
+                    updateSelectedSeatsDisplay();
+
+                    // Load seat map for selected schedule using id_jadwal
+                    // The stored procedure will handle both seat layout and booking status
+                    const jadwalId = selectedSchedule.id_jadwal || selectedSchedule.ID || selectedSchedule.id;
+                    if (jadwalId) {
+                        loadSeatMap(jadwalId);
+                    } else {
+                        console.error('No valid jadwal ID found in selected schedule');
+                        generateDefaultSeatMap();
+                    }
+
+                    calculateTotal();
+                } catch (error) {
+                    console.error('Error parsing schedule data:', error);
+                    showAlert('Data jadwal tidak valid', 'error');
+                    scheduleInfo.classList.add('hidden');
+                    selectedSchedule = null;
+                    clearSeatMap();
+                }
             } else {
                 scheduleInfo.classList.add('hidden');
                 selectedSchedule = null;
@@ -533,7 +588,7 @@
             }
         }
 
-        async function loadSeatMap(studioId) {
+        async function loadSeatMap(jadwalId) {
             const seatMapContainer = document.getElementById('seat_map');
             seatMapContainer.innerHTML = '<div class="text-center text-gray-500 py-4">Loading seat map...</div>';
 
@@ -542,19 +597,27 @@
                 bookedSeats = [];
 
                 // Get seat map from stored procedure
-                const response = await fetch(`/kasir/seatmap/${studioId}`);
+                const response = await fetch(`/kasir/seatmap/${jadwalId}`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
                 const data = await response.json();
 
-                if (data.success && data.seat_map.length > 0) {
+                if (data.success && data.seat_map && data.seat_map.length > 0) {
                     generateSeatMapFromData(data.seat_map);
                 } else {
+                    console.warn('No seat map data from API, using fallback');
                     // Fallback to default seat map
                     generateDefaultSeatMap();
+                    showAlert('Menggunakan layout kursi default. Data dari sistem tidak tersedia.', 'info');
                 }
             } catch (error) {
                 console.error('Error loading seat map:', error);
                 // Fallback to default seat map
                 generateDefaultSeatMap();
+                showAlert('Gagal memuat peta kursi. Menggunakan layout default.', 'error');
             }
         }
 
@@ -565,7 +628,8 @@
             // Group seats by row
             const seatsByRow = {};
             seatMapData.forEach(seat => {
-                const row = seat.row;
+                // Handle both property formats from stored procedures
+                const row = seat.row || seat.no_baris;
                 if (!seatsByRow[row]) {
                     seatsByRow[row] = [];
                 }
@@ -581,7 +645,11 @@
             seatMapContainer.style.gridTemplateColumns = `repeat(${maxSeatsPerRow + 2}, 1fr)`;
 
             rowLabels.forEach(rowNum => {
-                const seats = seatsByRow[rowNum].sort((a, b) => parseInt(a.col) - parseInt(b.col));
+                const seats = seatsByRow[rowNum].sort((a, b) => {
+                    const colA = a.col || a.no_kolom;
+                    const colB = b.col || b.no_kolom;
+                    return parseInt(colA) - parseInt(colB);
+                });
 
                 // Row label (left)
                 const rowLabelLeft = document.createElement('div');
@@ -595,19 +663,25 @@
                     const seatElement = document.createElement('div');
                     seatElement.className =
                         'w-8 h-8 border rounded text-xs flex items-center justify-center font-medium transition-all duration-200 cursor-pointer';
-                    seatElement.textContent = seat.col;
-                    seatElement.setAttribute('data-seat', seat.seat_id);
+
+                    // Handle both property formats from stored procedures
+                    const seatCode = seat.seat_id || seat.seat_code;
+                    const column = seat.col || seat.no_kolom;
+                    const status = seat.status || seat.status_kursi;
+
+                    seatElement.textContent = column;
+                    seatElement.setAttribute('data-seat', seatCode);
 
                     // Set initial status based on data from stored procedure
-                    if (seat.status === 'booked') {
+                    if (status === 'booked' || status === 'Booked') {
                         seatElement.className +=
                             ' bg-red-200 border-red-400 text-red-800 cursor-not-allowed';
                         seatElement.onclick = null;
-                        bookedSeats.push(seat.seat_id);
+                        bookedSeats.push(seatCode);
                     } else {
                         seatElement.className +=
                             ' bg-green-200 border-green-400 text-green-800 hover:bg-green-300 hover:scale-110';
-                        seatElement.onclick = () => toggleSeat(seat.seat_id);
+                        seatElement.onclick = () => toggleSeat(seatCode);
                     }
 
                     seatMapContainer.appendChild(seatElement);
@@ -776,7 +850,9 @@
             document.getElementById('total_tickets').textContent = ticketCount;
 
             if (selectedSchedule && ticketCount > 0) {
-                const ticketPrice = parseInt(selectedSchedule.harga_film); // Use harga_film instead of 'Harga Tiket'
+                // Handle different property formats from stored procedures
+                const ticketPrice = parseInt(selectedSchedule.harga_film || selectedSchedule['Harga Tiket'] ||
+                    selectedSchedule.harga || 0);
                 const totalAmount = ticketCount * ticketPrice;
                 document.getElementById('total_amount').textContent = 'Rp ' + totalAmount.toLocaleString('id-ID');
             } else {
@@ -810,20 +886,31 @@
                 return;
             }
 
+            // Validate customer phone
+            const customerPhone = formData.get('customer_phone');
+            if (!customerPhone || customerPhone.length < 8) {
+                showAlert('Nomor HP harus minimal 8 karakter', 'error');
+                return;
+            }
+
             // Show loading state
             submitBtn.disabled = true;
             submitBtn.innerHTML =
                 '<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Memproses...';
 
+            // Handle different property formats for price calculation
+            const ticketPrice = parseInt(selectedSchedule.harga_film || selectedSchedule['Harga Tiket'] || selectedSchedule
+                .harga || 0);
+
             const transactionData = {
                 customer_name: formData.get('customer_name'),
-                customer_email: formData.get('customer_email'),
+                customer_email: formData.get('customer_email') || '',
                 customer_phone: formData.get('customer_phone'),
                 schedule: selectedSchedule,
                 seats: selectedSeats,
                 payment_method: formData.get('payment_method'),
                 ticket_count: selectedSeats.length,
-                total_amount: selectedSeats.length * parseInt(selectedSchedule.harga_film)
+                total_amount: selectedSeats.length * ticketPrice
             };
 
             fetch('/kasir/tickets/create', {
