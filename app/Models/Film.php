@@ -17,6 +17,7 @@ class Film extends Model
         'sinopsis',
         'durasi_menit',
         'rating_usia',
+        'harga_film',
     ];
 
     public function jadwalTayangs()

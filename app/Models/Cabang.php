@@ -15,6 +15,7 @@ class Cabang extends Model
     protected $fillable = [
         'nama_cabang',
         'alamat',
+        'kode_cabang_kota',
     ];
 
     public function studios()

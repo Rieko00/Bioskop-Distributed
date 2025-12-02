@@ -18,20 +18,23 @@
 
                     @if (Auth::user()->role === 'admin')
                         <!-- Admin Menu Items -->
-                        <x-nav-link :href="route('admin.users')" :active="request()->routeIs('admin.users')">
+                        <x-nav-link :href="route('admin.users')" :active="request()->routeIs('admin.users*')">
                             {{ __('Users') }}
                         </x-nav-link>
-                        <x-nav-link :href="route('admin.branches')" :active="request()->routeIs('admin.branches')">
+                        <x-nav-link :href="route('admin.branches')" :active="request()->routeIs('admin.branches*')">
                             {{ __('Branches') }}
                         </x-nav-link>
-                        <x-nav-link :href="route('admin.films')" :active="request()->routeIs('admin.films')">
+                        <x-nav-link :href="route('admin.studios')" :active="request()->routeIs('admin.studios*')">
+                            {{ __('Studios') }}
+                        </x-nav-link>
+                        <x-nav-link :href="route('admin.films')" :active="request()->routeIs('admin.films*')">
                             {{ __('Films') }}
                         </x-nav-link>
-                        <x-nav-link :href="route('admin.reports')" :active="request()->routeIs('admin.reports')">
-                            {{ __('Reports') }}
+                        <x-nav-link :href="route('admin.schedules')" :active="request()->routeIs('admin.schedules*')">
+                            {{ __('Schedules') }}
                         </x-nav-link>
-                        <x-nav-link :href="route('admin.settings')" :active="request()->routeIs('admin.settings')">
-                            {{ __('Settings') }}
+                        <x-nav-link :href="route('admin.reports')" :active="request()->routeIs('admin.reports*')">
+                            {{ __('Reports') }}
                         </x-nav-link>
                     @elseif(Auth::user()->role === 'kasir')
                         <!-- Kasir Menu Items -->
@@ -120,20 +123,23 @@
 
             @if (Auth::user()->role === 'admin')
                 <!-- Admin Responsive Menu -->
-                <x-responsive-nav-link :href="route('admin.users')" :active="request()->routeIs('admin.users')">
+                <x-responsive-nav-link :href="route('admin.users')" :active="request()->routeIs('admin.users*')">
                     {{ __('Users') }}
                 </x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('admin.branches')" :active="request()->routeIs('admin.branches')">
+                <x-responsive-nav-link :href="route('admin.branches')" :active="request()->routeIs('admin.branches*')">
                     {{ __('Branches') }}
                 </x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('admin.films')" :active="request()->routeIs('admin.films')">
+                <x-responsive-nav-link :href="route('admin.studios')" :active="request()->routeIs('admin.studios*')">
+                    {{ __('Studios') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('admin.films')" :active="request()->routeIs('admin.films*')">
                     {{ __('Films') }}
                 </x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('admin.reports')" :active="request()->routeIs('admin.reports')">
-                    {{ __('Reports') }}
+                <x-responsive-nav-link :href="route('admin.schedules')" :active="request()->routeIs('admin.schedules*')">
+                    {{ __('Schedules') }}
                 </x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('admin.settings')" :active="request()->routeIs('admin.settings')">
-                    {{ __('Settings') }}
+                <x-responsive-nav-link :href="route('admin.reports')" :active="request()->routeIs('admin.reports*')">
+                    {{ __('Reports') }}
                 </x-responsive-nav-link>
             @elseif(Auth::user()->role === 'kasir')
                 <!-- Kasir Responsive Menu -->
