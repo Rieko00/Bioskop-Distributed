@@ -8,6 +8,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Symfony\Component\HttpFoundation\Response;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Barryvdh\DomPDF\Facade\Pdf;
 use App\Models\User;
 use App\Models\Cabang;
 use App\Models\Studio;
@@ -543,7 +547,139 @@ class AdminDashboardController extends Controller
     // =================== OTHER VIEWS ===================
     public function reports(): View
     {
-        return view('admin.reports');
+        try {
+            $logTransaksis = DB::select('EXEC sp_GetLogTransaksis');
+            $cabangs = DB::select('EXEC sp_GetCabangs');
+            $films = DB::select('EXEC sp_GetFilms');
+            return view('admin.log_transaksi', compact('logTransaksis', 'cabangs', 'films'));
+        } catch (\Exception $e) {
+            $logTransaksis = [];
+            $cabangs = [];
+            $films = [];
+            return view('admin.log_transaksi', compact('logTransaksis', 'cabangs', 'films'))->with(['error' => 'Failed to load transaction logs: ' . $e->getMessage()]);
+        }
+    }
+
+    public function getLogTransaksiById($rowguid): JsonResponse
+    {
+        try {
+            $logTransaksi = DB::select('EXEC sp_GetLogTransaksiById ?', [$rowguid]);
+            if (empty($logTransaksi)) {
+                return response()->json(['success' => false, 'message' => 'Log transaksi not found'], 404);
+            }
+            return response()->json(['success' => true, 'data' => $logTransaksi[0]]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function filterLogTransaksi(Request $request): JsonResponse
+    {
+        try {
+            $logTransaksis = DB::select('EXEC sp_GetLogTransaksisByFilter ?, ?, ?, ?', [
+                $request->start_date,
+                $request->end_date,
+                $request->id_cabang,
+                $request->id_film
+            ]);
+            return response()->json(['success' => true, 'data' => $logTransaksis]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function exportLogTransaksiExcel(Request $request): Response
+    {
+        try {
+            $logTransaksis = DB::select('EXEC sp_GetLogTransaksisByFilter ?, ?, ?, ?', [
+                $request->start_date,
+                $request->end_date,
+                $request->id_cabang,
+                $request->id_film
+            ]);
+
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+
+            // Header
+            $headers = [
+                'ID',
+                'No Transaksi',
+                'Cabang',
+                'Pelanggan',
+                'Email',
+                'Film',
+                'Studio',
+                'Tanggal Tayang',
+                'Waktu Mulai',
+                'Kursi',
+                'Total Bayar',
+                'Metode Pembayaran',
+                'Status',
+                'Waktu Transaksi'
+            ];
+
+            $column = 'A';
+            foreach ($headers as $header) {
+                $sheet->setCellValue($column . '1', $header);
+                $column++;
+            }
+
+            // Data
+            $row = 2;
+            foreach ($logTransaksis as $log) {
+                $sheet->setCellValue('A' . $row, $log->id);
+                $sheet->setCellValue('B' . $row, $log->no_transaksi ?? '-');
+                $sheet->setCellValue('C' . $row, $log->nama_cabang ?? '-');
+                $sheet->setCellValue('D' . $row, $log->nama_pelanggan ?? '-');
+                $sheet->setCellValue('E' . $row, $log->email_pelanggan ?? '-');
+                $sheet->setCellValue('F' . $row, $log->judul_film ?? '-');
+                $sheet->setCellValue('G' . $row, $log->nama_studio ?? '-');
+                $sheet->setCellValue('H' . $row, $log->tanggal_tayang ?? '-');
+                $sheet->setCellValue('I' . $row, $log->waktu_mulai ?? '-');
+                $sheet->setCellValue('J' . $row, $log->seat_code ?? '-');
+                $sheet->setCellValue('K' . $row, $log->total_bayar ?? 0);
+                $sheet->setCellValue('L' . $row, $log->metode_pembayaran ?? '-');
+                $sheet->setCellValue('M' . $row, $log->status_pembayaran ?? '-');
+                $sheet->setCellValue('N' . $row, $log->waktu_transaksi ?? '-');
+                $row++;
+            }
+
+            $writer = new Xlsx($spreadsheet);
+            $fileName = 'log_transaksi_' . date('Y_m_d_H_i_s') . '.xlsx';
+            $tempPath = storage_path('app/temp/' . $fileName);
+
+            if (!file_exists(dirname($tempPath))) {
+                mkdir(dirname($tempPath), 0777, true);
+            }
+
+            $writer->save($tempPath);
+
+            return response()->download($tempPath)->deleteFileAfterSend(true);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function exportLogTransaksiPdf(Request $request): Response
+    {
+        try {
+            $logTransaksis = DB::select('EXEC sp_GetLogTransaksisByFilter ?, ?, ?, ?', [
+                $request->start_date,
+                $request->end_date,
+                $request->id_cabang,
+                $request->id_film
+            ]);
+
+            $pdf = Pdf::loadView('admin.reports.pdf', compact('logTransaksis'))
+                ->setPaper('a4', 'landscape');
+
+            $fileName = 'log_transaksi_' . date('Y_m_d_H_i_s') . '.pdf';
+
+            return $pdf->download($fileName);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
     }
 
     public function settings(): View

@@ -17,7 +17,7 @@
             <!-- Summary Cards -->
             <div class="mb-8">
                 <h3 class="text-lg font-semibold text-gray-900 mb-6">Ringkasan Hari Ini</h3>
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <!-- Tiket Terjual -->
                     <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg border-l-4 border-blue-500">
                         <div class="p-6">
@@ -42,19 +42,11 @@
                             <div class="text-sm font-medium text-gray-600 mt-1">Film Berbeda</div>
                         </div>
                     </div>
-
-                    <!-- Refund -->
-                    <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg border-l-4 border-red-500">
-                        <div class="p-6">
-                            <div class="text-3xl font-bold text-red-600">{{ $summary['refund'] }}</div>
-                            <div class="text-sm font-medium text-gray-600 mt-1">Refund</div>
-                        </div>
-                    </div>
                 </div>
             </div>
 
             <!-- Quick Actions -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1   gap-6 mb-8">
                 <!-- Jual Tiket -->
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                     <div class="p-6">
@@ -74,43 +66,6 @@
                     </div>
                 </div>
 
-                <!-- Scan QR -->
-                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                    <div class="p-6">
-                        <div class="flex items-center">
-                            <div class="p-3 rounded-full bg-green-100 text-green-600 mr-4">
-                                📱
-                            </div>
-                            <div class="flex-1">
-                                <h4 class="text-lg font-semibold text-gray-900">Scan QR Code</h4>
-                                <p class="text-sm text-gray-600">Validasi tiket pelanggan</p>
-                            </div>
-                        </div>
-                        <button
-                            class="mt-4 w-full bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded">
-                            Scan Tiket
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Refund -->
-                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                    <div class="p-6">
-                        <div class="flex items-center">
-                            <div class="p-3 rounded-full bg-red-100 text-red-600 mr-4">
-                                🔄
-                            </div>
-                            <div class="flex-1">
-                                <h4 class="text-lg font-semibold text-gray-900">Proses Refund</h4>
-                                <p class="text-sm text-gray-600">Pengembalian tiket</p>
-                            </div>
-                        </div>
-                        <button
-                            class="mt-4 w-full bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded">
-                            Proses Refund
-                        </button>
-                    </div>
-                </div>
             </div>
 
             <!-- Recent Transactions & Popular Films -->

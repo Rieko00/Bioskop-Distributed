@@ -74,6 +74,10 @@ Route::middleware(['auth', 'check.role:admin'])->prefix('admin')->name('admin.')
 
     // Reports and Settings
     Route::get('/reports', [AdminDashboardController::class, 'reports'])->name('reports');
+    Route::get('/reports/log-transaksi/{rowguid}', [AdminDashboardController::class, 'getLogTransaksiById'])->name('reports.log-transaksi.show');
+    Route::post('/reports/log-transaksi/filter', [AdminDashboardController::class, 'filterLogTransaksi'])->name('reports.log-transaksi.filter');
+    Route::get('/reports/log-transaksi/export/excel', [AdminDashboardController::class, 'exportLogTransaksiExcel'])->name('reports.log-transaksi.excel');
+    Route::get('/reports/log-transaksi/export/pdf', [AdminDashboardController::class, 'exportLogTransaksiPdf'])->name('reports.log-transaksi.pdf');
     Route::get('/settings', [AdminDashboardController::class, 'settings'])->name('settings');
 });
 
