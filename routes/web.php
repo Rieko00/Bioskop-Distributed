@@ -53,6 +53,7 @@ Route::middleware(['auth', 'check.role:admin'])->prefix('admin')->name('admin.')
     // Studio Management Routes
     Route::get('/studios', [AdminDashboardController::class, 'studios'])->name('studios');
     Route::get('/studios/cabang/{cabangId}', [AdminDashboardController::class, 'getStudiosByCabang'])->name('studios.by-cabang');
+    Route::get('/studios/{id}/seatmap', [AdminDashboardController::class, 'getSeatMap'])->name('studios.seatmap');
     Route::post('/studios', [AdminDashboardController::class, 'storeStudio'])->name('studios.store');
     Route::put('/studios/{id}', [AdminDashboardController::class, 'updateStudio'])->name('studios.update');
     // Route::delete('/studios/{id}', [AdminDashboardController::class, 'deleteStudio'])->name('studios.destroy');

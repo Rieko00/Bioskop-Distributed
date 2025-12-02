@@ -275,8 +275,8 @@ class AdminDashboardController extends Controller
         $validator = Validator::make($request->all(), [
             'id_cabang' => 'required|integer|exists:cabangs,id_cabang',
             'nama_studio' => 'required|string|max:255',
-            'tipe_studio' => 'required|string|max:100',
-            'kapasitas' => 'required|integer|min:1'
+            'jumlah_baris' => 'required|integer|min:1|max:26',
+            'jumlah_kolom_per_baris' => 'required|integer|min:1|max:50'
         ]);
 
         if ($validator->fails()) {
@@ -284,14 +284,18 @@ class AdminDashboardController extends Controller
         }
 
         try {
-            $result = DB::select('EXEC sp_CreateStudio ?, ?, ?, ?', [
+            $result = DB::select('EXEC sp_CreateStudioWithSeats ?, ?, ?, ?', [
                 $request->id_cabang,
                 $request->nama_studio,
-                $request->tipe_studio,
-                $request->kapasitas
+                $request->jumlah_baris,
+                $request->jumlah_kolom_per_baris
             ]);
 
-            return response()->json(['success' => true, 'data' => $result[0], 'message' => 'Studio created successfully']);
+            return response()->json([
+                'success' => true,
+                'data' => $result[0],
+                'message' => 'Studio dan kursi berhasil dibuat. Total kapasitas: ' . ($request->jumlah_baris * $request->jumlah_kolom_per_baris) . ' kursi'
+            ]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
@@ -302,7 +306,6 @@ class AdminDashboardController extends Controller
         $validator = Validator::make($request->all(), [
             'id_cabang' => 'required|integer|exists:cabangs,id_cabang',
             'nama_studio' => 'required|string|max:255',
-            'tipe_studio' => 'required|string|max:100',
         ]);
 
         if ($validator->fails()) {
@@ -310,11 +313,10 @@ class AdminDashboardController extends Controller
         }
 
         try {
-            DB::select('EXEC sp_UpdateStudio ?, ?, ?, ?', [
+            DB::select('EXEC sp_UpdateStudio ?, ?, ?', [
                 $id,
                 $request->id_cabang,
                 $request->nama_studio,
-                $request->tipe_studio,
             ]);
 
             return response()->json(['success' => true, 'message' => 'Studio updated successfully']);
@@ -328,6 +330,26 @@ class AdminDashboardController extends Controller
         try {
             DB::select('EXEC sp_DeleteStudio ?', [$id]);
             return response()->json(['success' => true, 'message' => 'Studio deleted successfully']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function getSeatMap($id): JsonResponse
+    {
+        try {
+            $studio = DB::select('EXEC sp_GetStudioById ?', [$id]);
+            if (empty($studio)) {
+                return response()->json(['success' => false, 'message' => 'Studio not found'], 404);
+            }
+
+            $seats = DB::select('SELECT * FROM seat_maps WHERE id_studio = ? ORDER BY no_baris, CAST(no_kolom AS INT)', [$id]);
+
+            return response()->json([
+                'success' => true,
+                'studio' => $studio[0],
+                'seats' => $seats
+            ]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
