@@ -91,8 +91,6 @@
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                             <button onclick="editSchedule({{ $jadwal->id_jadwal }})"
                                                 class="text-indigo-600 hover:text-indigo-900 mr-3">Edit</button>
-                                            <button onclick="deleteSchedule({{ $jadwal->id_jadwal }})"
-                                                class="text-red-600 hover:text-red-900">Hapus</button>
                                         </td>
                                     </tr>
                                 @empty
@@ -160,13 +158,6 @@
                                 class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
                                 required>
                         </div>
-
-                        <div>
-                            <label class="block text-gray-700 text-sm font-bold mb-2">Waktu Selesai</label>
-                            <input type="time" id="waktuSelesai" name="waktu_selesai"
-                                class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                                required readonly>
-                        </div>
                     </div>
 
                     <div class="flex justify-end gap-4">
@@ -193,8 +184,6 @@
         document.getElementById('scheduleForm').addEventListener('submit', handleSubmit);
 
         // Auto calculate end time when start time or film changes
-        document.getElementById('waktuMulai').addEventListener('change', calculateEndTime);
-        document.getElementById('idFilm').addEventListener('change', calculateEndTime);
 
         function openAddModal() {
             isEdit = false;
@@ -227,12 +216,10 @@
             // Parse time
             const timeParts = timeText.split(' - ');
             const startTime = timeParts[0];
-            const endTime = timeParts[1];
 
             document.getElementById('scheduleId').value = id;
             document.getElementById('tanggalTayang').value = formattedDate;
             document.getElementById('waktuMulai').value = startTime;
-            document.getElementById('waktuSelesai').value = endTime;
 
             // Select appropriate film and studio (simplified - may need adjustment)
             const filmOptions = document.getElementById('idFilm').options;
@@ -270,8 +257,6 @@
 
                 const endHours = endDate.getHours().toString().padStart(2, '0');
                 const endMinutes = endDate.getMinutes().toString().padStart(2, '0');
-
-                document.getElementById('waktuSelesai').value = `${endHours}:${endMinutes}`;
             }
         }
 

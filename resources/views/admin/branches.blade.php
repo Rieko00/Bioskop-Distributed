@@ -62,8 +62,6 @@
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                             <button onclick="editCabang({{ $cabang->id_cabang }})"
                                                 class="text-indigo-600 hover:text-indigo-900 mr-3">Edit</button>
-                                            <button onclick="deleteCabang({{ $cabang->id_cabang }})"
-                                                class="text-red-600 hover:text-red-900">Hapus</button>
                                         </td>
                                     </tr>
                                 @empty

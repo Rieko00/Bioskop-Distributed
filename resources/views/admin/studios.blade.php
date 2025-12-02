@@ -78,8 +78,6 @@
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                             <button onclick="editStudio({{ $studio->id_studio }})"
                                                 class="text-indigo-600 hover:text-indigo-900 mr-3">Edit</button>
-                                            <button onclick="deleteStudio({{ $studio->id_studio }})"
-                                                class="text-red-600 hover:text-red-900">Hapus</button>
                                         </td>
                                     </tr>
                                 @empty
@@ -194,7 +192,7 @@
         function deleteStudio(id) {
             if (confirm(
                     'Apakah Anda yakin ingin menghapus studio ini? Semua jadwal tayang yang terkait juga akan terpengaruh.'
-                    )) {
+                )) {
                 fetch(`/admin/studios/${id}`, {
                         method: 'DELETE',
                         headers: {

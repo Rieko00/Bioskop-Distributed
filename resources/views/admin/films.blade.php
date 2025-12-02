@@ -84,8 +84,6 @@
                                                 class="text-blue-600 hover:text-blue-900 mr-3">Detail</button>
                                             <button onclick="editFilm({{ $film->id_film }})"
                                                 class="text-indigo-600 hover:text-indigo-900 mr-3">Edit</button>
-                                            <button onclick="deleteFilm({{ $film->id_film }})"
-                                                class="text-red-600 hover:text-red-900">Hapus</button>
                                         </td>
                                     </tr>
                                 @empty
@@ -277,7 +275,7 @@
         function deleteFilm(id) {
             if (confirm(
                     'Apakah Anda yakin ingin menghapus film ini? Semua jadwal tayang yang terkait juga akan terpengaruh.'
-                    )) {
+                )) {
                 fetch(`/admin/films/${id}`, {
                         method: 'DELETE',
                         headers: {

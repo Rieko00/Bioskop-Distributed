@@ -19,8 +19,9 @@ return new class extends Migration
             $table->string('metode_pembayaran', 20)->nullable();
             $table->integer('total_bayar')->nullable();
 
-            $table->foreign('id_pelanggan')->references('id_pelanggan')->on('pelanggans')->onDelete('cascade');
-            $table->foreign('id_cabang')->references('id_cabang')->on('cabangs')->onDelete('cascade');
+            $table->foreign('id_pelanggan')->references('id_pelanggan')->on('pelanggans');
+            $table->foreign('id_cabang')->references('id_cabang')->on('cabangs');
+            // $table->foreign('users_id')->references('id')->on('users');
         });
     }
 

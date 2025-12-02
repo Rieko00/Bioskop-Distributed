@@ -74,8 +74,6 @@
                                                 class="text-indigo-600 hover:text-indigo-900 mr-3">Edit</button>
                                             <button onclick="changePassword({{ $user->id }})"
                                                 class="text-yellow-600 hover:text-yellow-900 mr-3">Password</button>
-                                            <button onclick="deleteUser({{ $user->id }})"
-                                                class="text-red-600 hover:text-red-900">Hapus</button>
                                         </td>
                                     </tr>
                                 @empty

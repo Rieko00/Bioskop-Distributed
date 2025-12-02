@@ -168,7 +168,7 @@ class AdminDashboardController extends Controller
             return view('admin.branches', compact('cabangs'));
         } catch (\Exception $e) {
             $cabangs = [];
-            return view('admin.branches', compact('cabangs'))->withErrors(['error' => 'Failed to load branches data.']);
+            return view('admin.branches', compact('cabangs'))->with(['error' => 'Failed to load branches data.']);
         }
     }
 
@@ -256,7 +256,7 @@ class AdminDashboardController extends Controller
         } catch (\Exception $e) {
             $studios = [];
             $cabangs = [];
-            return view('admin.studios', compact('studios', 'cabangs'))->withErrors(['error' => 'Failed to load studios data.']);
+            return view('admin.studios', compact('studios', 'cabangs'))->with(['error' => 'Failed to load studios data.']);
         }
     }
 
@@ -303,7 +303,6 @@ class AdminDashboardController extends Controller
             'id_cabang' => 'required|integer|exists:cabangs,id_cabang',
             'nama_studio' => 'required|string|max:255',
             'tipe_studio' => 'required|string|max:100',
-            'kapasitas' => 'required|integer|min:1'
         ]);
 
         if ($validator->fails()) {
@@ -311,12 +310,11 @@ class AdminDashboardController extends Controller
         }
 
         try {
-            DB::select('EXEC sp_UpdateStudio ?, ?, ?, ?, ?', [
+            DB::select('EXEC sp_UpdateStudio ?, ?, ?, ?', [
                 $id,
                 $request->id_cabang,
                 $request->nama_studio,
                 $request->tipe_studio,
-                $request->kapasitas
             ]);
 
             return response()->json(['success' => true, 'message' => 'Studio updated successfully']);
@@ -343,7 +341,7 @@ class AdminDashboardController extends Controller
             return view('admin.films', compact('films'));
         } catch (\Exception $e) {
             $films = [];
-            return view('admin.films', compact('films'))->withErrors(['error' => 'Failed to load films data.']);
+            return view('admin.films', compact('films'))->with(['error' => 'Failed to load films data.']);
         }
     }
 
@@ -441,7 +439,7 @@ class AdminDashboardController extends Controller
             $jadwals = [];
             $films = [];
             $studios = [];
-            return view('admin.schedules', compact('jadwals', 'films', 'studios'))->withErrors(['error' => 'Failed to load schedules data.']);
+            return view('admin.schedules', compact('jadwals', 'films', 'studios'))->with(['error' => 'Failed to load schedules data.']);
         }
     }
 
@@ -461,7 +459,6 @@ class AdminDashboardController extends Controller
             'id_film' => 'required|integer|exists:films,id_film',
             'id_studio' => 'required|integer|exists:studios,id_studio',
             'waktu_mulai' => 'required|date_format:H:i',
-            'waktu_selesai' => 'required|date_format:H:i|after:waktu_mulai',
             'tanggal_tayang' => 'required|date|after_or_equal:today'
         ]);
 
@@ -470,11 +467,10 @@ class AdminDashboardController extends Controller
         }
 
         try {
-            $result = DB::select('EXEC sp_CreateJadwalTayang ?, ?, ?, ?, ?', [
+            $result = DB::select('EXEC sp_CreateJadwalTayang ?, ?, ?, ?', [
                 $request->id_film,
                 $request->id_studio,
                 $request->waktu_mulai,
-                $request->waktu_selesai,
                 $request->tanggal_tayang
             ]);
 
@@ -490,7 +486,6 @@ class AdminDashboardController extends Controller
             'id_film' => 'required|integer|exists:films,id_film',
             'id_studio' => 'required|integer|exists:studios,id_studio',
             'waktu_mulai' => 'required|date_format:H:i',
-            'waktu_selesai' => 'required|date_format:H:i|after:waktu_mulai',
             'tanggal_tayang' => 'required|date'
         ]);
 
@@ -499,12 +494,11 @@ class AdminDashboardController extends Controller
         }
 
         try {
-            DB::select('EXEC sp_UpdateJadwalTayang ?, ?, ?, ?, ?, ?', [
+            DB::select('EXEC sp_UpdateJadwalTayang ?, ?, ?, ?, ?', [
                 $id,
                 $request->id_film,
                 $request->id_studio,
                 $request->waktu_mulai,
-                $request->waktu_selesai,
                 $request->tanggal_tayang
             ]);
 
