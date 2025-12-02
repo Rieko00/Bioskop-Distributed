@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class KasirDashboardController extends Controller
@@ -19,6 +20,9 @@ class KasirDashboardController extends Controller
     public function tickets()
     {
         try {
+            // Get branches using stored procedure
+            $branches = collect(DB::select('EXEC sp_GetCabangs'));
+
             // Get today's transactions
             $transaksiToday = collect(DB::select('EXEC sp_ViewTransaksiHeader'))
                 ->filter(function ($item) {
@@ -67,6 +71,7 @@ class KasirDashboardController extends Controller
 
             return view('kasir.tickets', [
                 'summary' => $summaryData,
+                'branches' => $branches,
                 'recentTransactions' => $recentTransactions,
                 'popularFilms' => $popularFilms
             ]);
@@ -82,12 +87,12 @@ class KasirDashboardController extends Controller
 
             return view('kasir.tickets', [
                 'summary' => $summaryData,
+                'branches' => collect([]),
                 'recentTransactions' => collect([]),
                 'popularFilms' => collect([]),
                 'error' => 'Gagal memuat data: ' . $e->getMessage()
             ]);
         }
-        return view('kasir.tickets');
     }
 
     public function schedules()
@@ -163,5 +168,213 @@ class KasirDashboardController extends Controller
             return $created_at->isCurrentMonth();
         })->count();
         return view('kasir.customers', ['customers' => $results, 'length' => $length, 'pelanggan_bulan_ini' => $pelanggan_bulan_ini]);
+    }
+
+    /**
+     * Create a new ticket transaction using stored procedure
+     */
+    public function createTicket(Request $request)
+    {
+        try {
+            // Validate the request data
+            $validatedData = $request->validate([
+                'customer_name' => 'required|string|max:255',
+                'customer_email' => 'nullable|email|max:255',
+                'customer_phone' => 'required|string|max:20',
+                'schedule' => 'required|array',
+                'seats' => 'required|array|min:1',
+                'payment_method' => 'required|string',
+                'ticket_count' => 'required|integer|min:1',
+                'total_amount' => 'required|numeric|min:0'
+            ]);
+
+            // Extract schedule information
+            $schedule = $validatedData['schedule'];
+            $jadwalId = $schedule['id_jadwal'];
+            $customerName = $validatedData['customer_name'];
+            $customerPhone = $validatedData['customer_phone'];
+            $customerEmail = $validatedData['customer_email'] ?? '';
+            $totalAmount = $validatedData['total_amount'];
+            $paymentMethod = $validatedData['payment_method'];
+            $seats = $validatedData['seats'];
+
+            // Create or get customer using stored procedure
+            $customerId = $this->createOrGetCustomer($customerName, $customerPhone, $customerEmail);
+
+            // Create transaction using stored procedure
+            $transactionResult = DB::select('EXEC sp_CreateTransaksi ?, ?, ?, ?, ?', [
+                $customerId,
+                $jadwalId,
+                $totalAmount,
+                $paymentMethod,
+                now()->format('Y-m-d H:i:s')
+            ]);
+
+            if (empty($transactionResult)) {
+                throw new \Exception('Gagal membuat transaksi');
+            }
+
+            $transactionId = $transactionResult[0]->id_transaksi ?? $transactionResult[0]->id;
+
+            // Create transaction details for each seat using stored procedure
+            foreach ($seats as $seat) {
+                // Create detail using stored procedure
+                $detailResult = DB::select('EXEC sp_CreateDetailTransaksi ?, ?, ?, ?', [
+                    $transactionId,
+                    $jadwalId,
+                    $seat, // seat_code like "A1", "B5"
+                    $schedule['harga_film']
+                ]);
+
+                if (empty($detailResult)) {
+                    Log::warning("Failed to create detail for seat {$seat}");
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Transaksi berhasil dibuat',
+                'transaction_id' => $transactionId,
+                'total_amount' => $validatedData['total_amount'],
+                'ticket_count' => $validatedData['ticket_count']
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memproses transaksi: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Create or get existing customer
+     */
+    private function createOrGetCustomer($name, $phone, $email = '')
+    {
+        try {
+            // Check if customer exists using stored procedure
+            $existingCustomer = DB::select('EXEC sp_GetPelangganByPhone ?', [$phone]);
+
+            if (!empty($existingCustomer)) {
+                return $existingCustomer[0]->id_pelanggan ?? $existingCustomer[0]->id;
+            }
+
+            // Create new customer using stored procedure
+            $customerResult = DB::select('EXEC sp_CreatePelanggan ?, ?, ?', [
+                $name,
+                $email,
+                $phone
+            ]);
+
+            if (empty($customerResult)) {
+                throw new \Exception('Gagal membuat pelanggan');
+            }
+
+            return $customerResult[0]->id_pelanggan ?? $customerResult[0]->id;
+        } catch (\Exception $e) {
+            // Fallback: create customer manually if stored procedures fail
+            try {
+                $customerId = DB::table('pelanggans')->insertGetId([
+                    'nama' => $name,
+                    'email' => $email,
+                    'no_telepon' => $phone,
+                    'tanggal_daftar' => now(),
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ]);
+                return $customerId;
+            } catch (\Exception $fallbackError) {
+                throw new \Exception('Gagal membuat pelanggan: ' . $e->getMessage());
+            }
+        }
+    }
+
+    public function getBookedSeats($jadwalId, $studioId = null)
+    {
+        try {
+            // Use the same stored procedure but filter for booked seats only
+            $seatData = collect(DB::select('EXEC sp_CheckSeatMapTersedia ?', [$jadwalId]));
+
+            // Filter only booked seats
+            $bookedSeats = $seatData
+                ->where('status_kursi', 'Booked')
+                ->map(function ($seat) {
+                    return [
+                        'seat_id' => $seat->seat_code,
+                        'kursi_row' => substr($seat->seat_code, 0, 1), // Extract row letter
+                        'kursi_nomor' => substr($seat->seat_code, 1) // Extract seat number
+                    ];
+                })
+                ->values()
+                ->toArray();
+
+            return response()->json([
+                'success' => true,
+                'booked_seats' => $bookedSeats
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil data kursi: ' . $e->getMessage(),
+                'booked_seats' => []
+            ], 500);
+        }
+    }
+
+    public function getSchedulesByBranch($branchId)
+    {
+        try {
+            $currentDate = Carbon::now()->format('Y-m-d');
+            $schedules = collect(DB::select('EXEC sp_CheckJadwalTersedia ?, ?', [$branchId, $currentDate]));
+
+            return response()->json([
+                'success' => true,
+                'schedules' => $schedules
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil jadwal: ' . $e->getMessage(),
+                'schedules' => []
+            ], 500);
+        }
+    }
+
+    public function getSeatMap($id_jadwal)
+    {
+        try {
+            // Use your stored procedure that gets seat map with booking status
+            $seatMapData = collect(DB::select('EXEC sp_CheckSeatMapTersedia ?', [$id_jadwal]));
+
+            if ($seatMapData->count() > 0) {
+                // Transform the data to match the expected format
+                $transformedData = $seatMapData->map(function ($seat) {
+                    return [
+                        'seat_id' => $seat->seat_code, // Use seat_code (A1, A2, B1, etc.)
+                        'row' => $seat->no_baris,
+                        'col' => $seat->no_kolom,
+                        'status' => strtolower($seat->status_kursi), // 'booked' or 'available'
+                    ];
+                });
+
+                return response()->json([
+                    'success' => true,
+                    'seat_map' => $transformedData->toArray()
+                ]);
+            } else {
+                // Return empty seat map if no data
+                return response()->json([
+                    'success' => true,
+                    'seat_map' => [],
+                    'message' => 'No seat data found for this schedule'
+                ]);
+            }
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil data seat map: ' . $e->getMessage(),
+                'seat_map' => []
+            ], 500);
+        }
     }
 }

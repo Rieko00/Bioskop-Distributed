@@ -17,7 +17,6 @@ return new class extends Migration
             $table->unsignedBigInteger('id_film')->nullable();
             $table->date('tanggal_tayang')->nullable();
             $table->time('waktu_mulai')->nullable();
-            $table->integer('harga_tiket')->nullable();
             $table->timestamps();
 
             $table->foreign('id_studio')->references('id_studio')->on('studios')->onDelete('cascade');

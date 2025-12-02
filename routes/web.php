@@ -43,10 +43,14 @@ Route::middleware(['auth', 'check.role:admin'])->prefix('admin')->name('admin.')
 Route::middleware(['auth', 'check.role:kasir'])->prefix('kasir')->name('kasir.')->group(function () {
     Route::get('/dashboard', [KasirDashboardController::class, 'index'])->name('dashboard');
     Route::get('/tickets', [KasirDashboardController::class, 'tickets'])->name('tickets');
+    Route::post('/tickets/create', [KasirDashboardController::class, 'createTicket'])->name('tickets.create');
     Route::get('/schedules', [KasirDashboardController::class, 'schedules'])->name('schedules');
     Route::get('/transactions', [KasirDashboardController::class, 'transactions'])->name('transactions');
     Route::get('/transactions/{id}', [KasirDashboardController::class, 'getTransactionDetail'])->name('transactions.detail');
     Route::get('/transactions/{id}/print', [KasirDashboardController::class, 'printTransaction'])->name('transactions.print');
+    Route::get('/seats/booked/{jadwalId}', [KasirDashboardController::class, 'getBookedSeats'])->name('seats.booked');
+    Route::get('/schedules/branch/{branchId}', [KasirDashboardController::class, 'getSchedulesByBranch'])->name('schedules.branch');
+    Route::get('/seatmap/{id_jadwal}', [KasirDashboardController::class, 'getSeatMap'])->name('seatmap');
     Route::get('/customers', [KasirDashboardController::class, 'customers'])->name('customers');
 });
 
